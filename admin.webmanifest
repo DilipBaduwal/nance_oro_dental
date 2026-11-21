@@ -1,0 +1,10 @@
+{
+  "name": "Nance Oro Dental Admin",
+  "short_name": "Nance Admin",
+  "start_url": "/admin.html",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#123c35",
+  "icons": [{ "src": "/assets/nance-polyclinic-logo.jpeg", "sizes": "1254x1254", "type": "image/jpeg", "purpose": "any maskable" }],
+  "scope": "/"
+}

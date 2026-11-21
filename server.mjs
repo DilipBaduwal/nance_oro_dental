@@ -182,14 +182,16 @@ if (url.pathname === '/api/inventory') {
   if (url.pathname === '/api/state') return json(res, state);
   if (url.pathname === '/api/health') return json(res, { ok: true, synchronizedPorts: [4173, 4174], syncedAt: state.syncedAt, supabase: supabaseEnabled, supabaseStatus: supabaseEnabled ? 'configured' : 'not configured' });
   const requested = url.pathname === '/' ? (req.socket.localPort === 4174 ? 'pos.html' : 'admin.html') : url.pathname.slice(1);
-  const allowed = new Set(['admin.html', 'pos.html', 'index.html', 'styles.css', 'print-features.js', 'admin-dashboard.js', 'admin-live-inventory.js', 'admin-controls.js', 'admin-employees.js', 'admin-employee-api.js', 'admin-navigation.js', 'admin-profit-reports.js', 'admin-purchase-units.js', 'admin-multi-purchase.js', 'admin-partial-payment.js', 'admin-supplier-payments.js', 'admin-requests.js', 'sales-app-v2.js', 'sales-login.js', 'sales-cancel.js', 'sales-doctor.js', 'sales-requests.js', 'assets/nance-polyclinic-logo.jpeg']);
+  const allowed = new Set(['admin.html', 'pos.html', 'index.html', 'styles.css', 'pwa.js', 'service-worker.js', 'admin.webmanifest', 'staff.webmanifest', 'print-features.js', 'admin-dashboard.js', 'admin-live-inventory.js', 'admin-controls.js', 'admin-employees.js', 'admin-employee-api.js', 'admin-navigation.js', 'admin-profit-reports.js', 'admin-purchase-units.js', 'admin-multi-purchase.js', 'admin-partial-payment.js', 'admin-supplier-payments.js', 'admin-requests.js', 'sales-app-v2.js', 'sales-login.js', 'sales-cancel.js', 'sales-doctor.js', 'sales-requests.js', 'assets/nance-polyclinic-logo.jpeg']);
   if (!allowed.has(requested)) return res.end('Not found');
   const file = path.join(root, requested);
-  res.setHeader('Content-Type', path.extname(file) === '.css' ? 'text/css' : path.extname(file) === '.html' ? 'text/html' : path.extname(file) === '.jpeg' ? 'image/jpeg' : 'text/javascript');
+  res.setHeader('Content-Type', path.extname(file) === '.css' ? 'text/css' : path.extname(file) === '.html' ? 'text/html' : path.extname(file) === '.jpeg' ? 'image/jpeg' : path.extname(file) === '.webmanifest' ? 'application/manifest+json' : 'text/javascript');
   let output = fs.readFileSync(file);
   if (requested === 'admin.html') output = Buffer.from(output.toString().replace('</body>', '<script src="print-features.js"></script><script src="admin-purchase-units.js"></script><script src="admin-multi-purchase.js"></script><script src="admin-partial-payment.js"></script><script src="admin-profit-reports.js"></script><script src="admin-supplier-payments.js"></script><script src="admin-requests.js"></script></body>'));
   if (requested === 'pos.html') output = Buffer.from(output.toString().replace('</body>', `${output.toString().includes('sales-login.js') ? '' : '<script src="sales-login.js"></script>'}<script src="print-features.js"></script><script src="sales-doctor.js"></script><script src="sales-requests.js"></script></body>`));
   res.end(output);
 }
 
-for (const port of [4173, 4174]) http.createServer(handler).listen(port, '127.0.0.1', () => console.log(`Pharmflow ${port}: http://localhost:${port}`));
+const listenPort = Number(process.env.PORT) || 4173;
+const listenHost = process.env.HOST || (process.env.PORT ? '0.0.0.0' : '127.0.0.1');
+http.createServer(handler).listen(listenPort, listenHost, () => console.log(`Pharmflow ${listenPort}: http://${listenHost}:${listenPort}`));
