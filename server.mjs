@@ -99,7 +99,7 @@ async function supabaseAuth(path, method, body) { const r=await fetch(`${supabas
 const employeeEmail = code => `${String(code).toLowerCase()}@nance.local`;
 
 async function cloudAdminState() {
-  const [sales, saleItems, medicines, batches, branches, suppliers, purchases, purchaseItems] = await Promise.all([
+  const [sales, saleItems, medicines, batches, branches, suppliers, purchases, purchaseItems, legacyImports] = await Promise.all([
     supabaseRequest('sales', 'GET', { select: 'id,branch_id,invoice_number,customer_name,customer_mobile,total,payment_method,status,created_at', order: 'created_at.desc', limit: 5000 }),
     supabaseRequest('sale_items', 'GET', { select: 'sale_id,medicine_id,quantity,unit_price', limit: 20000 }),
     supabaseRequest('medicines', 'GET', { select: 'id,name,generic_name', limit: 5000 }),
@@ -107,7 +107,8 @@ async function cloudAdminState() {
     supabaseRequest('branches', 'GET', { select: 'id,name', limit: 1000 }),
     supabaseRequest('suppliers', 'GET', { select: 'id,name,contact_name,phone,email,brands,categories,active,created_at', order: 'created_at.desc', limit: 5000 }),
     supabaseRequest('purchases', 'GET', { select: 'id,branch_id,supplier_id,invoice_number,subtotal,tax,total,created_at', order: 'created_at.desc', limit: 5000 }),
-    supabaseRequest('purchase_items', 'GET', { select: 'purchase_id,medicine_id,quantity,boxes,strips,pieces,unit_cost,tax_rate,line_total', limit: 20000 })
+    supabaseRequest('purchase_items', 'GET', { select: 'purchase_id,medicine_id,quantity,boxes,strips,pieces,unit_cost,tax_rate,line_total', limit: 20000 }),
+    supabaseRequest('legacy_imports', 'GET', { select: 'source_type,record', source_type: 'eq.supplier', limit: 5000 })
   ]);
   const medicineMap = new Map(medicines.map(item => [item.id, item]));
   const branchMap = new Map(branches.map(item => [item.id, item.name]));
@@ -178,10 +179,16 @@ async function cloudAdminState() {
     totalCost: Number(purchase.total) || 0, cost: Number(purchase.total) || 0,
     items: purchaseItemsByPurchase.get(purchase.id) || [], createdAt: purchase.created_at
   }));
-  const cloudSuppliers = suppliers.map(supplier => ({
+  const localSupplierOrder = new Map((state.suppliers || []).map((supplier, index) => [supplier.name.toLowerCase(), index]));
+  const cloudSuppliers = suppliers.map(supplier => {
+    const imported = legacyImports.find(row => row.record?.name?.toLowerCase() === supplier.name.toLowerCase())?.record || {};
+    return {
     id: supplier.id, name: supplier.name, contact: supplier.contact_name || '', phone: supplier.phone || '',
-    email: supplier.email || '', brands: supplier.brands || '', categories: supplier.categories || '', active: supplier.active
-  }));
+    email: supplier.email || '', brands: supplier.brands || '', categories: supplier.categories || '', active: supplier.active,
+    purchased: Number(imported.purchased) || 0, paid: Number(imported.paid) || 0, outstanding: Number(imported.outstanding) || 0,
+    payments: []
+  }; });
+  cloudSuppliers.sort((a, b) => (localSupplierOrder.get(a.name.toLowerCase()) ?? 9999) - (localSupplierOrder.get(b.name.toLowerCase()) ?? 9999));
   return { ...state, syncedAt: sales[0]?.created_at || purchases[0]?.created_at || state.syncedAt, transactions, inventory, purchases: cloudPurchases, suppliers: cloudSuppliers, salesToday: transactions.reduce((total, sale) => total + sale.amount, 0) };
 }
 
