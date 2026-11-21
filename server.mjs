@@ -297,6 +297,7 @@ if (url.pathname === '/api/inventory') {
   const allowed = new Set(['admin.html', 'pos.html', 'index.html', 'styles.css', 'pwa.js', 'service-worker.js', 'admin.webmanifest', 'staff.webmanifest', 'print-features.js', 'admin-dashboard.js', 'admin-live-inventory.js', 'admin-controls.js', 'admin-employees.js', 'admin-employee-api.js', 'admin-navigation.js', 'admin-profit-reports.js', 'admin-purchase-units.js', 'admin-multi-purchase.js', 'admin-partial-payment.js', 'admin-supplier-payments.js', 'admin-requests.js', 'sales-app-v2.js', 'sales-login.js', 'sales-cancel.js', 'sales-doctor.js', 'sales-requests.js', 'assets/nance-polyclinic-logo.jpeg']);
   if (!allowed.has(requested)) return res.end('Not found');
   const file = path.join(root, requested);
+  res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Content-Type', path.extname(file) === '.css' ? 'text/css' : path.extname(file) === '.html' ? 'text/html' : path.extname(file) === '.jpeg' ? 'image/jpeg' : path.extname(file) === '.webmanifest' ? 'application/manifest+json' : 'text/javascript');
   let output = fs.readFileSync(file);
   if (requested === 'admin.html') output = Buffer.from(output.toString().replace('</body>', '<script src="print-features.js"></script><script src="admin-purchase-units.js"></script><script src="admin-multi-purchase.js"></script><script src="admin-partial-payment.js"></script><script src="admin-profit-reports.js"></script><script src="admin-supplier-payments.js"></script><script src="admin-requests.js"></script></body>'));

@@ -16,9 +16,14 @@ function downloadExcel(type) {
 }
 
 async function loadPurchases() {
-  const response = await fetch('/api/purchases');
-  const data = await response.json();
-  document.querySelector('#admin-module-content').innerHTML = `<div class="table-wrap"><table class="data-table"><thead><tr><th>DATE</th><th>SUPPLIER</th><th>MEDICINE</th><th>QUANTITY</th><th>BUYING COST</th><th>TAX</th><th>TOTAL</th><th>PRINT</th></tr></thead><tbody>${data.purchases.map(p => `<tr><td>${new Date(p.createdAt).toLocaleString()}</td><td>${p.supplierName || p.supplier || '-'}</td><td>${p.name || (p.items||[]).map(i=>i.name).join(', ')}</td><td>${p.quantityLabel || (p.items||[]).map(i=>i.quantity).join(', ') || `${p.quantity} pieces`}</td><td>₹${Number(p.subtotal || p.totalCost || p.cost || 0).toFixed(2)}</td><td>${Number(p.taxPercent || 0)}% · ₹${Number(p.taxAmount || 0).toFixed(2)}</td><td>₹${Number(p.totalCost || p.cost || 0).toFixed(2)}</td><td><button class="secondary" onclick='printReceipt("Supplier purchase",${JSON.stringify(p)})'>Print</button></td></tr>`).join('') || '<tr><td colspan="8" class="empty">No purchases recorded</td></tr>'}</tbody></table></div>`;
+  try {
+    const response = await fetch('/api/purchases', { cache: 'no-store' });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || 'Purchases could not be loaded.');
+    document.querySelector('#admin-module-content').innerHTML = `<div class="table-wrap"><table class="data-table"><thead><tr><th>DATE</th><th>SUPPLIER</th><th>MEDICINE</th><th>QUANTITY</th><th>BUYING COST</th><th>TAX</th><th>TOTAL</th><th>PRINT</th></tr></thead><tbody>${data.purchases.map(p => `<tr><td>${new Date(p.createdAt).toLocaleString()}</td><td>${p.supplierName || p.supplier || '-'}</td><td>${p.name || (p.items||[]).map(i=>i.name).join(', ')}</td><td>${p.quantityLabel || (p.items||[]).map(i=>i.quantity).join(', ') || `${p.quantity} pieces`}</td><td>₹${Number(p.subtotal || p.totalCost || p.cost || 0).toFixed(2)}</td><td>${Number(p.taxPercent || 0)}% · ₹${Number(p.taxAmount || 0).toFixed(2)}</td><td>₹${Number(p.totalCost || p.cost || 0).toFixed(2)}</td><td><button class="secondary" onclick='printReceipt("Supplier purchase",${JSON.stringify(p)})'>Print</button></td></tr>`).join('') || '<tr><td colspan="8" class="empty">No purchases recorded</td></tr>'}</tbody></table></div>`;
+  } catch (error) {
+    document.querySelector('#admin-module-content').innerHTML = `<div class="empty">${escapeDentalHtml(error.message)}</div>`;
+  }
 }
 
 async function loadSuppliers() {
