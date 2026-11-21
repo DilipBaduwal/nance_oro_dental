@@ -322,7 +322,7 @@ if (req.method === 'POST' && url.pathname === '/api/sale' && supabaseEnabled) re
     if (!branches[0]) return json(res, { ok: false, error: 'Staff clinic branch was not found.' }, 400);
     const staffSession = dentalApi.getSession(req);
     const result = await dentalApi.recordSaleDirect({ branchId: branches[0].id, items, paymentMethod, paymentReference: sale.paymentReference || '', customer: sale.customer || '', phone: sale.phone || '', discount: 0, createdBy: staffSession?.employeeId || null, patientSource: sale.patientSource, doctor: sale.doctor });
-    const transaction = { invoice: result?.invoice_number || result?.invoice || '#SAVED', branch: branches[0].name, customer: sale.customer || 'Walk-in customer', phone: sale.phone || '', employee: sale.employee || '', patientSource: sale.patientSource || 'WALK_IN', doctor: sale.doctor || '', items, amount: Number(result?.total) || items.reduce((total, item) => total + item.amount, 0), payment: paymentMethod, paymentMethod, status: 'Completed', createdAt: new Date().toISOString() };
+    const transaction = { invoice: result?.invoice_number || result?.invoice || '#SAVED', branch: branches[0].name, customer: sale.customer || 'Walk-in customer', phone: sale.phone || '', employee: sale.employee || '', patientSource: sale.patientSource || 'WALK_IN', doctor: sale.doctor || '', items: result?.items || items, amount: Number(result?.total) || items.reduce((total, item) => total + item.amount, 0), payment: paymentMethod, paymentMethod, status: 'Completed', createdAt: new Date().toISOString() };
     return json(res, { ok: true, transaction, source: 'supabase' });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

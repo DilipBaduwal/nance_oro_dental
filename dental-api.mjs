@@ -245,7 +245,7 @@ export function createDentalApi({ supabaseUrl, anonKey, serviceKey, adminUsernam
       const remaining = Math.max(0, Number(allocation.batch.available_quantity) - allocation.quantity);
       await supabaseRequest('batches', 'PATCH', { id: `eq.${allocation.batch.id}` }, { available_quantity: remaining, status: remaining > 0 ? 'AVAILABLE' : 'OUT_OF_STOCK' }, 'return=minimal');
     }
-    return { id: saleId, invoice_number: invoice, total: subtotal - safeDiscount, branch_name: branches[0].name };
+    return { id: saleId, invoice_number: invoice, total: subtotal - safeDiscount, branch_name: branches[0].name, items: allocations.map(({ medicine, quantity, unitPrice }) => ({ name: medicine.name, quantity, price: unitPrice, amount: quantity * unitPrice })) };
   }
 
   async function health() {
