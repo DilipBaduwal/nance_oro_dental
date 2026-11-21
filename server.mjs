@@ -137,17 +137,29 @@ async function cloudAdminState() {
     paymentMethod: sale.payment_method || 'Cash',
     status: sale.status || 'Completed'
   }));
+  const localInventoryByName = new Map((state.inventory || []).map(item => [item.name.toLowerCase(), item]));
+  const primaryBranchId = branches.find(branch => branch.name === 'MG Road')?.id;
   const inventoryMap = new Map();
-  batches.forEach(batch => {
+  batches.filter(batch => !primaryBranchId || batch.branch_id === primaryBranchId).forEach(batch => {
     const medicine = medicineMap.get(batch.medicine_id);
     if (!medicine) return;
-    const item = inventoryMap.get(batch.medicine_id) || { name: medicine.name, generic: medicine.generic_name || '', stock: 0, price: Number(batch.selling_price) || 0, expiryDate: batch.expiry_date || '', batches: [] };
+    const localItem = localInventoryByName.get(medicine.name.toLowerCase());
+    const item = inventoryMap.get(batch.medicine_id) || { name: medicine.name, generic: medicine.generic_name || '', stock: 0, price: Number(batch.selling_price) || 0, expiryDate: localItem?.expiryDate || '', batches: [] };
     item.stock += Number(batch.available_quantity) || 0;
     item.price = Number(batch.selling_price) || item.price;
     item.batches.push({ batchNumber: batch.batch_number || '', expiryDate: batch.expiry_date || '', stock: Number(batch.available_quantity) || 0, status: batch.status || '' });
     inventoryMap.set(batch.medicine_id, item);
   });
-  const inventory = [...inventoryMap.values()].map(item => ({ ...item, expiryStatus: item.stock ? 'AVAILABLE' : 'OUT_OF_STOCK', value: item.stock * item.price }));
+  const inventory = [...inventoryMap.values()].map(item => {
+    const expiry = item.expiryDate ? new Date(`${item.expiryDate}T00:00:00`) : null;
+    const validExpiry = expiry && !Number.isNaN(expiry.getTime());
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const cutoff = new Date(today); cutoff.setMonth(cutoff.getMonth() + 3);
+    const expiryStatus = item.stock === 0 ? 'OUT_OF_STOCK' : validExpiry && expiry < today ? 'EXPIRED' : validExpiry && expiry <= cutoff ? 'EXPIRING_SOON' : item.stock < 15 ? 'LOW_STOCK' : 'AVAILABLE';
+    return { ...item, expiryStatus, nearExpiry: Boolean(validExpiry && expiry >= today && expiry <= cutoff), value: item.stock * item.price };
+  });
+  const inventoryOrder = new Map((state.inventory || []).map((item, index) => [item.name.toLowerCase(), index]));
+  inventory.sort((a, b) => (inventoryOrder.get(a.name.toLowerCase()) ?? 9999) - (inventoryOrder.get(b.name.toLowerCase()) ?? 9999));
   const supplierMap = new Map(suppliers.map(supplier => [supplier.id, supplier]));
   const purchaseItemsByPurchase = new Map();
   purchaseItems.forEach(item => {
