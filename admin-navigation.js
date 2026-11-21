@@ -71,14 +71,9 @@ async function initializeDentalAdmin() {
     document.querySelectorAll('.nav-item').forEach(item => item.classList.toggle('active', item.dataset.view === view));
     showAdminView(view);
   });
-  try {
-    const response = await fetch('/api/dental/session', { cache: 'no-store' });
-    const data = await response.json();
-    if (data.authenticated) await loadDentalAdmin();
-    else renderAdminLogin();
-  } catch (error) {
-    renderAdminLogin('Admin login service is unavailable. Start the server and try again.');
-  }
+  // Always require a fresh admin sign-in when the admin app is opened.
+  // The server still validates every protected API request as a second lock.
+  renderAdminLogin();
 }
 
 async function loadDentalAdmin() {

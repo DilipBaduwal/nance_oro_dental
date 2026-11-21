@@ -713,5 +713,5 @@ export function createDentalApi({ supabaseUrl, anonKey, serviceKey, adminUsernam
     return true;
   }
 
-  return { handle, configured, health, requireAdmin };
+  return { handle, configured, health, requireAdmin, getSession };
 }

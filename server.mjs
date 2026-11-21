@@ -98,19 +98,73 @@ async function supabaseRequest(resource, method='GET', query={}, body) { const u
 async function supabaseAuth(path, method, body) { const r=await fetch(`${supabaseUrl}/auth/v1/admin/${path}`,{method,headers:{apikey:supabaseServiceKey,Authorization:`Bearer ${supabaseServiceKey}`,'Content-Type':'application/json'},body:JSON.stringify(body)});const t=await r.text();if(!r.ok)throw new Error(t);return t?JSON.parse(t):{}; }
 const employeeEmail = code => `${String(code).toLowerCase()}@nance.local`;
 
+async function cloudAdminState() {
+  const [sales, saleItems, medicines, batches, branches] = await Promise.all([
+    supabaseRequest('sales', 'GET', { select: 'id,branch_id,invoice_number,customer_name,customer_mobile,total,payment_method,status,created_at', order: 'created_at.desc', limit: 5000 }),
+    supabaseRequest('sale_items', 'GET', { select: 'sale_id,medicine_id,quantity,unit_price', limit: 20000 }),
+    supabaseRequest('medicines', 'GET', { select: 'id,name,generic_name', limit: 5000 }),
+    supabaseRequest('batches', 'GET', { select: 'id,medicine_id,branch_id,batch_number,expiry_date,selling_price,available_quantity,status', limit: 10000 }),
+    supabaseRequest('branches', 'GET', { select: 'id,name', limit: 1000 })
+  ]);
+  const medicineMap = new Map(medicines.map(item => [item.id, item]));
+  const branchMap = new Map(branches.map(item => [item.id, item.name]));
+  const itemsBySale = new Map();
+  saleItems.forEach(item => {
+    if (!itemsBySale.has(item.sale_id)) itemsBySale.set(item.sale_id, []);
+    const medicine = medicineMap.get(item.medicine_id);
+    itemsBySale.get(item.sale_id).push({
+      name: medicine?.name || 'Medicine',
+      quantity: Number(item.quantity) || 0,
+      price: Number(item.unit_price) || 0,
+      amount: (Number(item.quantity) || 0) * (Number(item.unit_price) || 0)
+    });
+  });
+  const transactions = sales.map(sale => ({
+    invoice: sale.invoice_number?.startsWith('#') ? sale.invoice_number : `#${sale.invoice_number || sale.id}`,
+    createdAt: sale.created_at,
+    branch: branchMap.get(sale.branch_id) || '',
+    customer: sale.customer_name || 'Walk-in customer',
+    phone: sale.customer_mobile || '',
+    employee: '',
+    patientSource: 'WALK_IN',
+    doctor: '',
+    items: itemsBySale.get(sale.id) || [],
+    amount: Number(sale.total) || 0,
+    payment: sale.payment_method || 'Cash',
+    paymentMethod: sale.payment_method || 'Cash',
+    status: sale.status || 'Completed'
+  }));
+  const inventoryMap = new Map();
+  batches.forEach(batch => {
+    const medicine = medicineMap.get(batch.medicine_id);
+    if (!medicine) return;
+    const item = inventoryMap.get(batch.medicine_id) || { name: medicine.name, generic: medicine.generic_name || '', stock: 0, price: Number(batch.selling_price) || 0, expiryDate: batch.expiry_date || '', batches: [] };
+    item.stock += Number(batch.available_quantity) || 0;
+    item.price = Number(batch.selling_price) || item.price;
+    item.batches.push({ batchNumber: batch.batch_number || '', expiryDate: batch.expiry_date || '', stock: Number(batch.available_quantity) || 0, status: batch.status || '' });
+    inventoryMap.set(batch.medicine_id, item);
+  });
+  const inventory = [...inventoryMap.values()].map(item => ({ ...item, expiryStatus: item.stock ? 'AVAILABLE' : 'OUT_OF_STOCK', value: item.stock * item.price }));
+  return { ...state, syncedAt: sales[0]?.created_at || state.syncedAt, transactions, inventory, salesToday: transactions.reduce((total, sale) => total + sale.amount, 0) };
+}
+
+async function adminState() {
+  if (!supabaseEnabled) return state;
+  try { return await cloudAdminState(); } catch (error) { console.error('Cloud admin data unavailable:', error.message); return state; }
+}
+
 function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   const url = new URL(req.url, 'http://localhost');
   if (url.pathname.startsWith('/api/dental/')) return dentalApi.handle(req, res);
-  const adminPort = req.socket.localPort === 4173;
   const adminProtectedRoutes = new Set([
-    '/api/state', '/api/reports', '/api/employees', '/api/purchases',
-    '/api/suppliers', '/api/suppliers/payment', '/api/medicine-requests',
+    '/api/state', '/api/reports', '/api/purchases', '/api/suppliers/payment',
     '/api/medicine-requests/approve', '/api/purchases/normalized',
     '/api/purchases/invoice', '/api/export/bills', '/api/export/purchases',
-    '/api/export/inventory', '/api/stock/add', '/api/inventory'
+    '/api/export/inventory', '/api/stock/add'
   ]);
-  if (adminPort && adminProtectedRoutes.has(url.pathname)) {
+  const adminSessionRequired = adminProtectedRoutes.has(url.pathname) || (url.pathname === '/api/employees' && req.method !== 'GET') || (url.pathname === '/api/suppliers' && req.method !== 'GET');
+  if (adminSessionRequired) {
     if (!dentalApi.requireAdmin(req, res)) return;
   }
   if (req.method === 'POST' && url.pathname === '/api/login') return readBody(req).then(async input => { if(supabaseEnabled){try{const token=await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`,{method:'POST',headers:{apikey:process.env.SUPABASE_ANON_KEY,'Content-Type':'application/json'},body:JSON.stringify({email:employeeEmail(input.code),password:input.password})});if(!token.ok)return json(res,{ok:false,error:'Invalid employee ID or password'});const auth=await token.json(),profiles=await supabaseRequest('profiles','GET',{select:'employee_code,full_name,role,branch_id',id:`eq.${auth.user.id}`,limit:1}),branches=await supabaseRequest('branches','GET',{select:'id,name',id:`eq.${profiles[0]?.branch_id}`,limit:1});return json(res,{ok:true,employee:{code:profiles[0]?.employee_code||input.code,name:profiles[0]?.full_name||input.code,role:profiles[0]?.role||'BILLING_STAFF',branch:branches[0]?.name||'MG Road'}})}catch{return json(res,{ok:false,error:'Invalid employee ID or password'})}} const employee=state.employees.find(e=>e.code===input.code&&verifyPassword(input.password||'',e));return json(res,employee?{ok:true,employee:{code:employee.code,name:employee.name,role:employee.role,branch:employee.branch}}:{ok:false,error:'Invalid employee ID or password'}); });
@@ -166,20 +220,20 @@ if (req.method === 'GET' && url.pathname === '/api/export/inventory') {
   return csvDownload(res, 'pharmflow-inventory.csv', ['Medicine', 'Generic Name', 'Stock Pieces', 'Strips Per Box', 'Pieces Per Strip', 'Selling Price Per Piece', 'Stock Value', 'Expiry', 'Status'], inventory.map(item => [item.name, item.generic, item.stock, item.stripsPerBox, item.piecesPerStrip, item.price, item.value, item.expiryDate || '', item.expiryStatus]));
 }
   if (req.method === 'POST' && url.pathname === '/api/suppliers') return readBody(req).then(input => { if (!input.name) return json(res, { ok: false, error: 'Supplier name is required' }, 400); const supplier = { id: `SUP${String(Date.now()).slice(-5)}`, name: input.name, contact: input.contact || '', phone: input.phone || '', email: input.email || '', brands: input.brands || '', categories: input.categories || '' }; state.suppliers.push(supplier); saveState(); json(res, { ok: true, supplier }); });
-if (req.method === 'GET' && url.pathname === '/api/reports') {
-  applyExpiryRules();
-  const inventory = inventoryWithExpiry();
-  const salesTotal = state.transactions.reduce((total, transaction) => total + (Number(transaction.amount) || 0), 0);
-  const purchaseCost = state.purchases.reduce((total, purchase) => total + (Number(purchase.totalCost || purchase.cost) || 0), 0);
-  return json(res, { ok: true, salesTotal, purchaseCost, profit: salesTotal - purchaseCost, billCount: state.transactions.length, stockUnits: inventory.reduce((total, item) => total + item.stock, 0), stockValue: inventory.reduce((total, item) => total + item.value, 0), inventoryValue: inventory.reduce((total, item) => total + item.value, 0), nearExpiryCount: inventory.filter(item => item.nearExpiry).length, expiredCount: inventory.filter(item => item.expiryStatus === 'EXPIRED').length, inventory });
-}
+  if (req.method === 'GET' && url.pathname === '/api/reports') return adminState().then(admin => {
+    const inventory = supabaseEnabled ? admin.inventory : inventoryWithExpiry();
+    const salesTotal = admin.transactions.reduce((total, transaction) => total + (Number(transaction.amount) || 0), 0);
+    const purchaseCost = admin.purchases.reduce((total, purchase) => total + (Number(purchase.totalCost || purchase.cost) || 0), 0);
+    return json(res, { ok: true, salesTotal, purchaseCost, profit: salesTotal - purchaseCost, billCount: admin.transactions.length, stockUnits: inventory.reduce((total, item) => total + (Number(item.stock) || 0), 0), stockValue: inventory.reduce((total, item) => total + (Number(item.value) || 0), 0), inventoryValue: inventory.reduce((total, item) => total + (Number(item.value) || 0), 0), nearExpiryCount: inventory.filter(item => item.nearExpiry).length, expiredCount: inventory.filter(item => item.expiryStatus === 'EXPIRED').length, inventory });
+  });
   if (req.method === 'POST' && url.pathname === '/api/stock/add') return readBody(req).then(input => { const boxes = Math.max(0, Number(input.boxes) || 0), strips = Math.max(0, Number(input.strips) || 0), pieces = Math.max(0, Number(input.pieces) || 0), stripsPerBox = Math.max(1, Number(input.stripsPerBox) || 10), piecesPerStrip = Math.max(1, Number(input.piecesPerStrip) || 10), quantity = boxes * stripsPerBox * piecesPerStrip + strips * piecesPerStrip + pieces; if (!input.name || quantity < 1) return json(res, { ok: false, error: 'Medicine and at least one box, strip, or piece are required' }, 400); const product = state.inventory.find(item => item.name.toLowerCase() === String(input.name).toLowerCase()); if (product) { product.stock += quantity; product.generic = input.generic || product.generic; product.price = Number(input.sellingPrice) || product.price; } else state.inventory.push({ name: input.name, generic: input.generic || '', stock: quantity, price: Number(input.sellingPrice) || 0, stripsPerBox, piecesPerStrip }); state.syncedAt = new Date().toISOString(); saveState(); json(res, { ok: true, inventory: state.inventory }); });
   if (req.method === 'POST' && url.pathname === '/api/sale') return readBody(req).then(sale => { const items = Array.isArray(sale.items) ? sale.items.map(item => ({ name: String(item.name || '').trim(), quantity: Math.max(0, Number(item.quantity) || 0), price: Math.max(0, Number(item.price) || 0), amount: Math.max(0, Number(item.amount) || (Number(item.price) || 0) * (Number(item.quantity) || 0)) })).filter(item => item.name && item.quantity > 0) : []; if (!items.length) return json(res, { ok: false, error: 'Add at least one medicine with a valid quantity before billing.' }, 400); for (const item of items) { const product = state.inventory.find(p => p.name === item.name); if (!product || item.quantity > product.stock) return json(res, { ok: false, error: `Only ${product?.stock || 0} units available for ${item.name}` }, 400); } items.forEach(item => { state.inventory.find(p => p.name === item.name).stock -= item.quantity; }); const paymentMethod = sale.method || sale.paymentMethod || 'Cash'; const patientSource = sale.patientSource === 'DOCTOR_REFERRAL' ? 'DOCTOR_REFERRAL' : 'WALK_IN'; const doctor = patientSource === 'DOCTOR_REFERRAL' ? String(sale.doctor || sale.consultant || '').trim() : ''; if (patientSource === 'DOCTOR_REFERRAL' && !doctor) return json(res, { ok: false, error: 'A referring doctor is required for doctor referrals.' }, 400); const transaction = { invoice: `#INV-${String(Date.now()).slice(-5)}`, branch: sale.branch || 'MG Road', customer: sale.customer || 'Walk-in customer', phone: sale.phone || '', employee: sale.employee || '', patientSource, doctor, ageGender: sale.ageGender || sale.age || '', opdNumber: sale.opdNumber || sale.opd || sale.uhid || '', remarks: sale.remarks || '', items, amount: Number(sale.amount) || items.reduce((total, item) => total + item.amount, 0), payment: paymentMethod, paymentMethod, status: 'Completed', createdAt: new Date().toISOString() }; state.salesToday += transaction.amount; state.transactions.unshift(transaction); state.transactions = state.transactions.slice(0, 100); state.syncedAt = transaction.createdAt; saveState(); json(res, { ok: true, transaction, state }); });
 if (url.pathname === '/api/inventory') {
+  if (supabaseEnabled) return adminState().then(admin => json(res, { ok: true, inventory: admin.inventory }));
   applyExpiryRules();
   return json(res, { ok: true, inventory: inventoryWithExpiry() });
 }
-  if (url.pathname === '/api/state') return json(res, state);
+  if (url.pathname === '/api/state') return adminState().then(admin => json(res, admin));
   if (url.pathname === '/api/health') return json(res, { ok: true, synchronizedPorts: [4173, 4174], syncedAt: state.syncedAt, supabase: supabaseEnabled, supabaseStatus: supabaseEnabled ? 'configured' : 'not configured' });
   const requested = url.pathname === '/' ? (req.socket.localPort === 4174 ? 'pos.html' : 'admin.html') : url.pathname.slice(1);
   const allowed = new Set(['admin.html', 'pos.html', 'index.html', 'styles.css', 'pwa.js', 'service-worker.js', 'admin.webmanifest', 'staff.webmanifest', 'print-features.js', 'admin-dashboard.js', 'admin-live-inventory.js', 'admin-controls.js', 'admin-employees.js', 'admin-employee-api.js', 'admin-navigation.js', 'admin-profit-reports.js', 'admin-purchase-units.js', 'admin-multi-purchase.js', 'admin-partial-payment.js', 'admin-supplier-payments.js', 'admin-requests.js', 'sales-app-v2.js', 'sales-login.js', 'sales-cancel.js', 'sales-doctor.js', 'sales-requests.js', 'assets/nance-polyclinic-logo.jpeg']);
