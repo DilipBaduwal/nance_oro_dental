@@ -1,5 +1,15 @@
 let currentAdminView = 'dashboard';
 
+// Browsers can restore admin.html from the back/forward cache without
+// re-running the normal page initialization. Never leave a restored admin
+// screen visible without requiring the password again.
+window.addEventListener('pageshow', event => {
+  if (!event.persisted) return;
+  document.body.classList.remove('auth-required');
+  document.querySelector('#admin-logout')?.setAttribute('hidden', '');
+  renderAdminLogin();
+});
+
 function escapeDentalHtml(value = '') {
   return String(value).replace(/[&<>"']/g, character => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
