@@ -19,22 +19,14 @@ const dentalApi = createDentalApi({
   adminPassword: process.env.ADMIN_PASSWORD
 });
 const stateFile = path.join(root, 'pharmflow-state.json');
-const defaultEmployees = [{ code: 'EMP001', password: 'demo123', name: 'Billing Staff', role: 'BILLING_STAFF', branch: 'MG Road' }];
-const initialInventory = [
-  { name: 'Augmentin 625mg', generic: 'Amoxicillin + Clavulanate', stock: 24, price: 18.5 },
-  { name: 'Pantop 40mg', generic: 'Pantoprazole', stock: 86, price: 4.2 },
-  { name: 'Dolo 650mg', generic: 'Paracetamol', stock: 142, price: 2.1 },
-  { name: 'Telma 40mg', generic: 'Telmisartan', stock: 12, price: 7.8 },
-  { name: 'Azithral 500mg', generic: 'Azithromycin', stock: 7, price: 11.2 },
-  { name: 'Shelcal 500mg', generic: 'Calcium + Vitamin D3', stock: 53, price: 5.4 }
-];
-let state = fs.existsSync(stateFile) ? JSON.parse(fs.readFileSync(stateFile, 'utf8')) : { syncedAt: new Date().toISOString(), salesToday: 84260, transactions: [], inventory: initialInventory, employees: defaultEmployees, purchases: [], suppliers: [] };
-if (!Array.isArray(state.employees)) state.employees = defaultEmployees;
+let state = { syncedAt: new Date().toISOString(), salesToday: 0, transactions: [], inventory: [], employees: [], purchases: [], suppliers: [], medicineRequests: [], supplierPayments: [] };
 if (!Array.isArray(state.purchases)) state.purchases = [];
 if (!Array.isArray(state.suppliers)) state.suppliers = [];
-if (!Array.isArray(state.medicineRequests)) state.medicineRequests = [];
 state.inventory.forEach(item => { item.stripsPerBox = Number(item.stripsPerBox) || 10; item.piecesPerStrip = Number(item.piecesPerStrip) || 10; });
-function saveState() { fs.writeFileSync(stateFile, JSON.stringify(state, null, 2)); }
+function saveState() {
+  if (supabaseEnabled) return;
+  fs.writeFileSync(stateFile, JSON.stringify(state, null, 2));
+}
 function expiryWindow() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -108,7 +100,7 @@ async function cloudAdminState() {
     supabaseRequest('suppliers', 'GET', { select: 'id,name,contact_name,phone,email,brands,categories,active,created_at', order: 'created_at.desc', limit: 5000 }),
     supabaseRequest('purchases', 'GET', { select: 'id,branch_id,supplier_id,invoice_number,subtotal,tax,total,created_at', order: 'created_at.desc', limit: 5000 }),
     supabaseRequest('purchase_items', 'GET', { select: 'purchase_id,medicine_id,quantity,boxes,strips,pieces,unit_cost,tax_rate,line_total', limit: 20000 }),
-    supabaseRequest('legacy_imports', 'GET', { select: 'source_type,record', source_type: 'eq.supplier', limit: 5000 })
+    supabaseRequest('legacy_imports', 'GET', { select: 'source_type,record', limit: 10000 })
   ]);
   const medicineMap = new Map(medicines.map(item => [item.id, item]));
   const branchMap = new Map(branches.map(item => [item.id, item.name]));
@@ -138,7 +130,8 @@ async function cloudAdminState() {
     paymentMethod: sale.payment_method || 'Cash',
     status: sale.status || 'Completed'
   }));
-  const localInventoryByName = new Map((state.inventory || []).map(item => [item.name.toLowerCase(), item]));
+  const importedInventory = legacyImports.filter(row => row.source_type === 'inventory_snapshot').map(row => row.record).filter(Boolean);
+  const localInventoryByName = new Map(importedInventory.map(item => [item.name.toLowerCase(), item]));
   const primaryBranchId = branches.find(branch => branch.name === 'MG Road')?.id;
   const inventoryMap = new Map();
   batches.filter(batch => !primaryBranchId || batch.branch_id === primaryBranchId).forEach(batch => {
@@ -159,7 +152,7 @@ async function cloudAdminState() {
     const expiryStatus = item.stock === 0 ? 'OUT_OF_STOCK' : validExpiry && expiry < today ? 'EXPIRED' : validExpiry && expiry <= cutoff ? 'EXPIRING_SOON' : item.stock < 15 ? 'LOW_STOCK' : 'AVAILABLE';
     return { ...item, expiryStatus, nearExpiry: Boolean(validExpiry && expiry >= today && expiry <= cutoff), value: item.stock * item.price };
   });
-  const inventoryOrder = new Map((state.inventory || []).map((item, index) => [item.name.toLowerCase(), index]));
+  const inventoryOrder = new Map(importedInventory.map((item, index) => [item.name.toLowerCase(), index]));
   inventory.sort((a, b) => (inventoryOrder.get(a.name.toLowerCase()) ?? 9999) - (inventoryOrder.get(b.name.toLowerCase()) ?? 9999));
   const supplierMap = new Map(suppliers.map(supplier => [supplier.id, supplier]));
   const purchaseItemsByPurchase = new Map();
