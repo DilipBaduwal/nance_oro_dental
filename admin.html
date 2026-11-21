@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#123c35">
+  <title>Nance Oro Dental · Admin</title>
+  <link rel="stylesheet" href="styles.css?v=restore-admin-1">
+</head>
+<body data-app="admin">
+  <aside class="sidebar">
+    <div class="brand"><img class="company-logo" src="assets/nance-polyclinic-logo.jpeg" alt="Nance Polyclinic"><span>Nance Oro Dental</span></div>
+    <div class="workspace-label">ADMIN APP</div>
+    <nav>
+      <button class="nav-item active" data-view="dashboard"><span class="nav-symbol">◈</span><span>Dashboard</span></button>
+      <button class="nav-item" data-view="inventory"><span class="nav-symbol">▤</span><span>Inventory</span></button>
+      <button class="nav-item" data-view="bills"><span class="nav-symbol">▣</span><span>Bills</span></button>
+      <button class="nav-item" data-view="employees"><span class="nav-symbol">♙</span><span>Employees</span></button>
+      <button class="nav-item" data-view="sites"><span class="nav-symbol">⌖</span><span>Locations</span></button>
+      <button class="nav-item" data-view="purchases"><span class="nav-symbol">⇩</span><span>Purchases</span></button>
+      <button class="nav-item" data-view="suppliers"><span class="nav-symbol">◎</span><span>Suppliers</span></button>
+      <button class="nav-item" data-view="reports"><span class="nav-symbol">▥</span><span>Reports</span></button>
+    </nav>
+  </aside>
+  <main class="main">
+    <header class="topbar">
+      <div class="mobile-brand"><img class="company-logo" src="assets/nance-polyclinic-logo.jpeg" alt="Nance Polyclinic"><span>Nance Oro Dental</span></div>
+      <div class="breadcrumbs">Nance Oro Dental <span>/</span> <strong>Admin</strong></div>
+      <div class="top-actions"><span>Admin secure access</span><button class="secondary" id="admin-logout" type="button" hidden>Sign out</button></div>
+    </header>
+    <section id="app"></section>
+  </main>
+  <script src="admin-dashboard.js"></script>
+  <script src="admin-live-inventory.js"></script>
+  <script src="admin-controls.js"></script>
+  <script src="admin-employees.js"></script>
+  <script src="admin-employee-api.js"></script>
+  <script src="admin-geofence.js"></script>
+  <script src="admin-navigation.js"></script>
+  <script>initializeDentalAdmin()</script>
+</body>
+</html>

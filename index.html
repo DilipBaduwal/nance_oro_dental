@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#2563eb" />
+  <title>Pharmflow — Pharmacy ERP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-app="admin">
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark">✚</span><span>pharmflow</span></div>
+    <div class="workspace-label">WORKSPACE</div>
+    <nav>
+      <button class="nav-item active" data-view="overview">◈ <span>Overview</span></button>
+      <button class="nav-item" data-view="pos">▣ <span>POS Billing</span><em>⌘K</em></button>
+      <button class="nav-item" data-view="inventory">▤ <span>Inventory</span><b id="nav-alert">4</b></button>
+      <button class="nav-item" data-view="purchases">⇩ <span>Purchases</span></button>
+      <button class="nav-item" data-view="suppliers">◎ <span>Suppliers</span></button>
+      <button class="nav-item" data-view="reports">▥ <span>Reports</span></button>
+    </nav>
+    <div class="sidebar-bottom"><button class="nav-item">⚙ <span>Settings</span></button><div class="help-card"><strong>Need a hand?</strong><small>Visit our help center</small><button>Open help center →</button></div><div class="profile"><div class="avatar">AR</div><div><strong>Arjun Rao</strong><small>Owner / Admin</small></div><span>⌄</span></div></div>
+  </aside>
+  <main class="main">
+    <header class="topbar"><div class="mobile-brand">✚ pharmflow</div><div class="breadcrumbs">Pharmflow <span>/</span> <strong id="crumb">Overview</strong></div><div class="top-actions"><button class="branch-select">⌖ <span>All branches</span>⌄</button><button class="icon-button">♧<i></i></button><button class="icon-button">☼</button></div></header>
+    <section id="app"></section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

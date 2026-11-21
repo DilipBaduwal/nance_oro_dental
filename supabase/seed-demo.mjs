@@ -1,0 +1,9 @@
+import fs from 'node:fs';
+const env=Object.fromEntries(fs.readFileSync(new URL('../.env',import.meta.url),'utf8').split(/\r?\n/).filter(Boolean).map(x=>{const i=x.indexOf('=');return [x.slice(0,i),x.slice(i+1).replace(/^['"]|['"]$/g,'')]}));
+const base=`${env.SUPABASE_URL}/rest/v1`,headers={apikey:env.SUPABASE_ANON_KEY,Authorization:`Bearer ${env.SUPABASE_ANON_KEY}`,'Content-Type':'application/json',Prefer:'return=representation'};
+async function post(table,body){const r=await fetch(`${base}/${table}`,{method:'POST',headers,body:JSON.stringify(body)});const t=await r.text();if(!r.ok)throw new Error(`${table} ${r.status}: ${t}`);return JSON.parse(t)}
+const branch=(await post('branches',{name:'MG Road',code:'MG01',address:'MG Road, Bengaluru',status:'ACTIVE'}))[0];
+const medicines=[['Augmentin 625mg','Amoxicillin + Clavulanate',24,18.5],['Pantop 40mg','Pantoprazole',86,4.2],['Dolo 650mg','Paracetamol',142,2.1],['Telma 40mg','Telmisartan',0,7.8],['Azithral 500mg','Azithromycin',10,11.2],['Shelcal 500mg','Calcium + Vitamin D3',53,5.4]];
+const ids=[];for(const [name,generic,stock,price] of medicines){const m=(await post('medicines',{name,generic_name:generic,status:'ACTIVE'}))[0];ids.push((await post('batches',{medicine_id:m.id,branch_id:branch.id,batch_number:'DEMO-'+m.id.slice(0,6),expiry_date:'2027-12-31',purchase_price:price*.7,mrp:price,selling_price:price,received_quantity:stock,available_quantity:stock,status:stock?'AVAILABLE':'OUT_OF_STOCK'}))[0])}
+for(let i=1;i<=20;i++){const amount=Number((40+i*7.5).toFixed(2));await post('sales',{branch_id:branch.id,invoice_number:`DEMO-${new Date().toISOString().slice(0,10).replaceAll('-','')}-${String(i).padStart(3,'0')}`,customer_name:`Demo Customer ${i}`,customer_mobile:`90000000${String(i).padStart(2,'0')}`,subtotal:amount,discount:0,tax:0,total:amount,payment_method:['Cash','UPI','Card'][i%3],status:'COMPLETED'})}
+console.log('Seeded 1 branch, 6 medicines/batches, and 20 bills.');

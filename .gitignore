@@ -1,0 +1,6 @@
+.env
+.env.*
+node_modules/
+pharmflow-state.json
+*.log
+.DS_Store
