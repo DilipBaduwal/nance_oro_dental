@@ -6,7 +6,7 @@ async function employeeForm() {
       <label>Employee ID<input id="employee-code" class="search" maxlength="32" autocomplete="off" placeholder="Leave blank to generate one"></label>
       <label>Role<select id="employee-role" class="search"><option value="DOCTOR">Doctor</option><option value="SUPPORT_STAFF">Support Staff</option></select></label>
       <label>Initial password<input id="employee-password" type="password" class="search" minlength="6" maxlength="256" autocomplete="new-password" placeholder="At least 6 characters"></label>
-      <label>Location<select id="employee-branch" class="search" required><option value="MG Road">MG Road</option></select></label>
+      <label>Location<select id="employee-branch" class="search" required><option value="Assam">Assam</option></select></label>
       <p class="muted">Doctors appear in sales checkout. Support staff can sign in to the sales counter.</p>
       <button class="primary" id="employee-submit" type="button" style="width:100%">Create employee</button>
       <button class="secondary" type="button" style="width:100%;margin-top:8px" onclick="document.querySelector('#employee-modal').remove()">Cancel</button>
