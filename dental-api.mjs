@@ -493,9 +493,10 @@ export function createDentalApi({ supabaseUrl, anonKey, serviceKey, adminUsernam
               limit: 5000
             }),
             supabaseRequest('batches', 'GET', {
-              select: 'medicine_id,selling_price,available_quantity,status',
+              select: 'medicine_id,selling_price,available_quantity,status,expiry_date',
               branch_id: `eq.${session.branchId}`,
               status: 'eq.AVAILABLE',
+              order: 'expiry_date.asc',
               limit: 10000
             })
           ]);
@@ -509,7 +510,7 @@ export function createDentalApi({ supabaseUrl, anonKey, serviceKey, adminUsernam
             const product = products.get(batch.medicine_id);
             if (!product) continue;
             product.stock += Math.max(0, Number(batch.available_quantity) || 0);
-            if (Number(batch.selling_price) > 0) product.price = Number(batch.selling_price);
+            if (!product.price && Number(batch.selling_price) > 0) product.price = Number(batch.selling_price);
           }
           return json(res, {
             ok: true,

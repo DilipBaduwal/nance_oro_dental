@@ -140,10 +140,12 @@ async function cloudAdminState() {
     const medicine = medicineMap.get(batch.medicine_id);
     if (!medicine) return;
     const localItem = localInventoryByName.get(medicine.name.toLowerCase());
-    const item = inventoryMap.get(batch.medicine_id) || { name: medicine.name, generic: medicine.generic_name || '', stock: 0, price: Number(batch.selling_price) || 0, expiryDate: localItem?.expiryDate || '', batches: [] };
+    const item = inventoryMap.get(batch.medicine_id) || { name: medicine.name, generic: medicine.generic_name || '', stock: 0, price: Number(batch.selling_price) || 0, expiryDate: batch.expiry_date || localItem?.expiryDate || '', batches: [] };
     item.stock += Number(batch.available_quantity) || 0;
-    item.price = Number(batch.selling_price) || item.price;
-    item.batches.push({ batchNumber: batch.batch_number || '', expiryDate: batch.expiry_date || '', stock: Number(batch.available_quantity) || 0, status: batch.status || '' });
+    item.batches.push({ batchNumber: batch.batch_number || '', expiryDate: batch.expiry_date || '', stock: Number(batch.available_quantity) || 0, price: Number(batch.selling_price) || 0, status: batch.status || '' });
+    item.batches.sort((a, b) => String(a.expiryDate).localeCompare(String(b.expiryDate)));
+    item.price = item.batches[0]?.price || item.price;
+    item.expiryDate = item.batches[0]?.expiryDate || item.expiryDate;
     inventoryMap.set(batch.medicine_id, item);
   });
   const inventory = [...inventoryMap.values()].map(item => {
