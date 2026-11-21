@@ -198,6 +198,51 @@ export function createDentalApi({ supabaseUrl, anonKey, serviceKey, adminUsernam
     return rows.filter(branch => Number(branch.radius_meters) === STAFF_RADIUS_METERS);
   }
 
+  async function recordSaleDirect({ branchId, items, paymentMethod, paymentReference, customer, phone, discount = 0, createdBy = null }) {
+    const [medicines, batches, branches] = await Promise.all([
+      supabaseRequest('medicines', 'GET', { select: 'id,name,status', status: 'eq.ACTIVE', limit: 5000 }),
+      supabaseRequest('batches', 'GET', { select: 'id,medicine_id,selling_price,available_quantity,status,expiry_date', branch_id: `eq.${branchId}`, status: 'eq.AVAILABLE', order: 'expiry_date.asc', limit: 10000 }),
+      supabaseRequest('branches', 'GET', { select: 'id,name', id: `eq.${branchId}`, limit: 1 })
+    ]);
+    if (!branches[0]) throw new Error('Staff clinic branch was not found.');
+    const medicineByName = new Map(medicines.map(m => [String(m.name).toLowerCase(), m]));
+    const batchesByMedicine = new Map();
+    for (const batch of batches) {
+      if (!batchesByMedicine.has(batch.medicine_id)) batchesByMedicine.set(batch.medicine_id, []);
+      batchesByMedicine.get(batch.medicine_id).push(batch);
+    }
+    const allocations = [];
+    let subtotal = 0;
+    for (const item of items) {
+      const medicine = medicineByName.get(item.name.trim().toLowerCase());
+      if (!medicine) throw new Error(`Medicine not found: ${item.name}`);
+      let remaining = Number(item.quantity);
+      const available = (batchesByMedicine.get(medicine.id) || []).reduce((sum, batch) => sum + Math.max(0, Number(batch.available_quantity) || 0), 0);
+      if (available < remaining) throw new Error(`Only ${available} units available for ${medicine.name}`);
+      for (const batch of batchesByMedicine.get(medicine.id) || []) {
+        if (!remaining) break;
+        const quantity = Math.min(remaining, Math.max(0, Number(batch.available_quantity) || 0));
+        if (!quantity) continue;
+        const unitPrice = Number(batch.selling_price) || 0;
+        allocations.push({ medicine, batch, quantity, unitPrice });
+        subtotal += quantity * unitPrice;
+        remaining -= quantity;
+      }
+    }
+    const safeDiscount = Math.min(Number(discount) || 0, subtotal);
+    const saleId = crypto.randomUUID();
+    const invoice = `INV-${Date.now().toString().slice(-8)}`;
+    const saleBody = { id: saleId, branch_id: branchId, invoice_number: invoice, customer_name: customer || null, customer_mobile: phone || null, subtotal, discount: safeDiscount, tax: 0, total: subtotal - safeDiscount, payment_method: paymentMethod, payment_reference: paymentReference || null, status: 'COMPLETED' };
+    if (createdBy) saleBody.created_by = createdBy;
+    await supabaseRequest('sales', 'POST', {}, saleBody);
+    await supabaseRequest('sale_items', 'POST', {}, allocations.map(({ medicine, batch, quantity, unitPrice }) => ({ sale_id: saleId, medicine_id: medicine.id, batch_id: batch.id, quantity, unit_price: unitPrice, gst_rate: 0 })));
+    for (const allocation of allocations) {
+      const remaining = Math.max(0, Number(allocation.batch.available_quantity) - allocation.quantity);
+      await supabaseRequest('batches', 'PATCH', { id: `eq.${allocation.batch.id}` }, { available_quantity: remaining, status: remaining > 0 ? 'AVAILABLE' : 'OUT_OF_STOCK' }, 'return=minimal');
+    }
+    return { id: saleId, invoice_number: invoice, total: subtotal - safeDiscount, branch_name: branches[0].name };
+  }
+
   async function health() {
     if (!configured) {
       return {
@@ -489,15 +534,7 @@ export function createDentalApi({ supabaseUrl, anonKey, serviceKey, adminUsernam
         return json(res, { ok: false, error: 'Enter valid bill items and payment details.' }, 400);
       }
       try {
-        const sale = await supabaseRequest('rpc/record_sale', 'POST', {}, {
-          p_branch_id: session.branchId,
-          p_items: items.map(item => ({ name: item.name.trim(), quantity: Number(item.quantity) })),
-          p_payment_method: paymentMethod,
-          p_payment_reference: paymentReference || null,
-          p_customer_name: customer || null,
-          p_customer_mobile: phone || null,
-          p_discount: discount
-        });
+        const sale = await recordSaleDirect({ branchId: session.branchId, items, paymentMethod, paymentReference, customer, phone, discount, createdBy: session.employeeId });
         invalidateSupabaseSnapshot();
         return json(res, {
           ok: true,
@@ -713,5 +750,5 @@ export function createDentalApi({ supabaseUrl, anonKey, serviceKey, adminUsernam
     return true;
   }
 
-  return { handle, configured, health, requireAdmin, getSession, setStaffSession: (req, res, user) => setSession(res, req, { role: 'STAFF', ...user }) };
+  return { handle, configured, health, requireAdmin, getSession, recordSaleDirect, setStaffSession: (req, res, user) => setSession(res, req, { role: 'STAFF', ...user }) };
 }

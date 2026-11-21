@@ -290,7 +290,7 @@ if (req.method === 'POST' && url.pathname === '/api/sale' && supabaseEnabled) re
   try {
     const branches = await supabaseRequest('branches', 'GET', { select: 'id,name', name: `eq.${sale.branch || 'MG Road'}`, limit: 1 });
     if (!branches[0]) return json(res, { ok: false, error: 'Staff clinic branch was not found.' }, 400);
-    const result = await supabaseRequest('rpc/record_sale', 'POST', {}, { p_branch_id: branches[0].id, p_items: items.map(item => ({ name: item.name, quantity: item.quantity })), p_payment_method: paymentMethod, p_payment_reference: sale.paymentReference || null, p_customer_name: sale.customer || null, p_customer_mobile: sale.phone || null, p_discount: 0 });
+    const result = await dentalApi.recordSaleDirect({ branchId: branches[0].id, items, paymentMethod, paymentReference: sale.paymentReference || '', customer: sale.customer || '', phone: sale.phone || '', discount: 0 });
     const transaction = { invoice: result?.invoice_number || result?.invoice || '#SAVED', branch: branches[0].name, customer: sale.customer || 'Walk-in customer', phone: sale.phone || '', employee: sale.employee || '', patientSource: sale.patientSource || 'WALK_IN', doctor: sale.doctor || '', items, amount: Number(result?.total) || items.reduce((total, item) => total + item.amount, 0), payment: paymentMethod, paymentMethod, status: 'Completed', createdAt: new Date().toISOString() };
     return json(res, { ok: true, transaction, source: 'supabase' });
   } catch (error) {
