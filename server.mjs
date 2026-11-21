@@ -90,8 +90,8 @@ async function supabaseAuth(path, method, body) { const r=await fetch(`${supabas
 const employeeEmail = code => `${String(code).toLowerCase()}@nance.local`;
 
 async function cloudAdminState() {
-  const [sales, saleItems, medicines, batches, branches, suppliers, purchases, purchaseItems, legacyImports] = await Promise.all([
-    supabaseRequest('sales', 'GET', { select: 'id,branch_id,invoice_number,customer_name,customer_mobile,total,payment_method,status,created_at', order: 'created_at.desc', limit: 5000 }),
+  const [sales, saleItems, medicines, batches, branches, suppliers, purchases, purchaseItems, legacyImports, profiles] = await Promise.all([
+    supabaseRequest('sales', 'GET', { select: 'id,branch_id,invoice_number,customer_name,customer_mobile,total,payment_method,status,created_by,created_at', order: 'created_at.desc', limit: 5000 }),
     supabaseRequest('sale_items', 'GET', { select: 'sale_id,medicine_id,quantity,unit_price', limit: 20000 }),
     supabaseRequest('medicines', 'GET', { select: 'id,name,generic_name', limit: 5000 }),
     supabaseRequest('batches', 'GET', { select: 'id,medicine_id,branch_id,batch_number,expiry_date,selling_price,available_quantity,status', limit: 10000 }),
@@ -99,9 +99,12 @@ async function cloudAdminState() {
     supabaseRequest('suppliers', 'GET', { select: 'id,name,contact_name,phone,email,brands,categories,active,created_at', order: 'created_at.desc', limit: 5000 }),
     supabaseRequest('purchases', 'GET', { select: 'id,branch_id,supplier_id,invoice_number,subtotal,tax,total,created_at', order: 'created_at.desc', limit: 5000 }),
     supabaseRequest('purchase_items', 'GET', { select: 'purchase_id,medicine_id,quantity,boxes,strips,pieces,unit_cost,tax_rate,line_total', limit: 20000 }),
-    supabaseRequest('legacy_imports', 'GET', { select: 'source_type,record', limit: 10000 })
+    supabaseRequest('legacy_imports', 'GET', { select: 'source_key,source_type,record', limit: 10000 }),
+    supabaseRequest('profiles', 'GET', { select: 'id,full_name,employee_code', limit: 5000 })
   ]);
   const medicineMap = new Map(medicines.map(item => [item.id, item]));
+  const profileMap = new Map(profiles.map(profile => [profile.id, profile.full_name || profile.employee_code || '']));
+  const saleMetadata = new Map(legacyImports.filter(row => row.source_type === 'sale_metadata').map(row => [row.record?.saleId || row.source_key?.slice(5), row.record || {}]));
   const branchMap = new Map(branches.map(item => [item.id, item.name]));
   const itemsBySale = new Map();
   saleItems.forEach(item => {
@@ -120,9 +123,9 @@ async function cloudAdminState() {
     branch: branchMap.get(sale.branch_id) || '',
     customer: sale.customer_name || 'Walk-in customer',
     phone: sale.customer_mobile || '',
-    employee: '',
-    patientSource: 'WALK_IN',
-    doctor: '',
+    employee: profileMap.get(sale.created_by) || '',
+    patientSource: saleMetadata.get(sale.id)?.patientSource || 'WALK_IN',
+    doctor: saleMetadata.get(sale.id)?.doctor || '',
     items: itemsBySale.get(sale.id) || [],
     amount: Number(sale.total) || 0,
     payment: sale.payment_method || 'Cash',
@@ -290,7 +293,7 @@ if (req.method === 'POST' && url.pathname === '/api/sale' && supabaseEnabled) re
     const branches = await supabaseRequest('branches', 'GET', { select: 'id,name', name: `eq.${sale.branch || 'MG Road'}`, limit: 1 });
     if (!branches[0]) return json(res, { ok: false, error: 'Staff clinic branch was not found.' }, 400);
     const staffSession = dentalApi.getSession(req);
-    const result = await dentalApi.recordSaleDirect({ branchId: branches[0].id, items, paymentMethod, paymentReference: sale.paymentReference || '', customer: sale.customer || '', phone: sale.phone || '', discount: 0, createdBy: staffSession?.employeeId || null });
+    const result = await dentalApi.recordSaleDirect({ branchId: branches[0].id, items, paymentMethod, paymentReference: sale.paymentReference || '', customer: sale.customer || '', phone: sale.phone || '', discount: 0, createdBy: staffSession?.employeeId || null, patientSource: sale.patientSource, doctor: sale.doctor });
     const transaction = { invoice: result?.invoice_number || result?.invoice || '#SAVED', branch: branches[0].name, customer: sale.customer || 'Walk-in customer', phone: sale.phone || '', employee: sale.employee || '', patientSource: sale.patientSource || 'WALK_IN', doctor: sale.doctor || '', items, amount: Number(result?.total) || items.reduce((total, item) => total + item.amount, 0), payment: paymentMethod, paymentMethod, status: 'Completed', createdAt: new Date().toISOString() };
     return json(res, { ok: true, transaction, source: 'supabase' });
   } catch (error) {

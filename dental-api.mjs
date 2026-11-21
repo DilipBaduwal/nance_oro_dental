@@ -198,7 +198,7 @@ export function createDentalApi({ supabaseUrl, anonKey, serviceKey, adminUsernam
     return rows.filter(branch => Number(branch.radius_meters) === STAFF_RADIUS_METERS);
   }
 
-  async function recordSaleDirect({ branchId, items, paymentMethod, paymentReference, customer, phone, discount = 0, createdBy = null }) {
+  async function recordSaleDirect({ branchId, items, paymentMethod, paymentReference, customer, phone, discount = 0, createdBy = null, patientSource = 'WALK_IN', doctor = '' }) {
     const [medicines, batches, branches] = await Promise.all([
       supabaseRequest('medicines', 'GET', { select: 'id,name,status', status: 'eq.ACTIVE', limit: 5000 }),
       supabaseRequest('batches', 'GET', { select: 'id,medicine_id,selling_price,available_quantity,status,expiry_date', branch_id: `eq.${branchId}`, status: 'eq.AVAILABLE', order: 'expiry_date.asc', limit: 10000 }),
@@ -236,6 +236,11 @@ export function createDentalApi({ supabaseUrl, anonKey, serviceKey, adminUsernam
     if (createdBy) saleBody.created_by = createdBy;
     await supabaseRequest('sales', 'POST', {}, saleBody);
     await supabaseRequest('sale_items', 'POST', {}, allocations.map(({ medicine, batch, quantity, unitPrice }) => ({ sale_id: saleId, medicine_id: medicine.id, batch_id: batch.id, quantity, unit_price: unitPrice, gst_rate: 0 })));
+    await supabaseRequest('legacy_imports', 'POST', {}, {
+      source_key: `sale:${saleId}`,
+      source_type: 'sale_metadata',
+      record: { saleId, employeeId: createdBy, patientSource: patientSource === 'DOCTOR_REFERRAL' ? 'DOCTOR_REFERRAL' : 'WALK_IN', doctor: patientSource === 'DOCTOR_REFERRAL' ? String(doctor || '').trim() : '' }
+    });
     for (const allocation of allocations) {
       const remaining = Math.max(0, Number(allocation.batch.available_quantity) - allocation.quantity);
       await supabaseRequest('batches', 'PATCH', { id: `eq.${allocation.batch.id}` }, { available_quantity: remaining, status: remaining > 0 ? 'AVAILABLE' : 'OUT_OF_STOCK' }, 'return=minimal');
@@ -534,7 +539,7 @@ export function createDentalApi({ supabaseUrl, anonKey, serviceKey, adminUsernam
         return json(res, { ok: false, error: 'Enter valid bill items and payment details.' }, 400);
       }
       try {
-        const sale = await recordSaleDirect({ branchId: session.branchId, items, paymentMethod, paymentReference, customer, phone, discount, createdBy: session.employeeId });
+        const sale = await recordSaleDirect({ branchId: session.branchId, items, paymentMethod, paymentReference, customer, phone, discount, createdBy: session.employeeId, patientSource: input.patientSource, doctor: input.doctor });
         invalidateSupabaseSnapshot();
         return json(res, {
           ok: true,
