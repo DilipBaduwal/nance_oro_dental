@@ -179,7 +179,11 @@ async function cloudAdminState() {
     totalCost: Number(purchase.total) || 0, cost: Number(purchase.total) || 0,
     items: purchaseItemsByPurchase.get(purchase.id) || [], createdAt: purchase.created_at
   }));
-  const localSupplierOrder = new Map((state.suppliers || []).map((supplier, index) => [supplier.name.toLowerCase(), index]));
+  const localSupplierOrder = new Map(legacyImports
+    .map(row => row.record)
+    .filter(record => record?.name)
+    .sort((a, b) => String(a.id || '').localeCompare(String(b.id || ''), undefined, { numeric: true }))
+    .map((record, index) => [record.name.toLowerCase(), index]));
   const cloudSuppliers = suppliers.map(supplier => {
     const imported = legacyImports.find(row => row.record?.name?.toLowerCase() === supplier.name.toLowerCase())?.record || {};
     return {
