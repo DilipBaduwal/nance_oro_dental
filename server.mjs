@@ -163,9 +163,19 @@ function handler(req, res) {
     '/api/purchases/invoice', '/api/export/bills', '/api/export/purchases',
     '/api/export/inventory', '/api/stock/add'
   ]);
+  const staffReadableRoutes = new Set(['/api/inventory', '/api/employees', '/api/suppliers', '/api/medicine-requests']);
+  const session = dentalApi.getSession(req);
+  const isAdmin = session?.role === 'ADMIN';
+  const isStaff = session?.role === 'STAFF';
+  const staffMayRead = staffReadableRoutes.has(url.pathname) && req.method === 'GET';
   const adminSessionRequired = adminProtectedRoutes.has(url.pathname) || (url.pathname === '/api/employees' && req.method !== 'GET') || (url.pathname === '/api/suppliers' && req.method !== 'GET');
-  if (adminSessionRequired) {
+  if (url.pathname === '/api/state' && !isAdmin && !isStaff) {
     if (!dentalApi.requireAdmin(req, res)) return;
+  } else if (adminSessionRequired && !(url.pathname === '/api/state' && isStaff)) {
+    if (!dentalApi.requireAdmin(req, res)) return;
+  } else if (staffMayRead && !isAdmin && !isStaff) {
+    res.statusCode = 401;
+    return json(res, { ok: false, error: 'Staff or admin sign-in is required.' }, 401);
   }
   if (req.method === 'POST' && url.pathname === '/api/login') return readBody(req).then(async input => { if(supabaseEnabled){try{const token=await fetch(`${supabaseUrl}/auth/v1/token?grant_type=password`,{method:'POST',headers:{apikey:process.env.SUPABASE_ANON_KEY,'Content-Type':'application/json'},body:JSON.stringify({email:employeeEmail(input.code),password:input.password})});if(!token.ok)return json(res,{ok:false,error:'Invalid employee ID or password'});const auth=await token.json(),profiles=await supabaseRequest('profiles','GET',{select:'employee_code,full_name,role,branch_id',id:`eq.${auth.user.id}`,limit:1}),branches=await supabaseRequest('branches','GET',{select:'id,name',id:`eq.${profiles[0]?.branch_id}`,limit:1});return json(res,{ok:true,employee:{code:profiles[0]?.employee_code||input.code,name:profiles[0]?.full_name||input.code,role:profiles[0]?.role||'BILLING_STAFF',branch:branches[0]?.name||'MG Road'}})}catch{return json(res,{ok:false,error:'Invalid employee ID or password'})}} const employee=state.employees.find(e=>e.code===input.code&&verifyPassword(input.password||'',e));return json(res,employee?{ok:true,employee:{code:employee.code,name:employee.name,role:employee.role,branch:employee.branch}}:{ok:false,error:'Invalid employee ID or password'}); });
   if (req.method === 'GET' && url.pathname === '/api/employees') return (async()=>{if(supabaseEnabled){try{const rows=await supabaseRequest('profiles','GET',{select:'employee_code,full_name,role,active,branch_id',employee_code:'not.is.null',limit:1000}),branches=await supabaseRequest('branches','GET',{select:'id,name',limit:1000}),names=new Map(branches.map(b=>[b.id,b.name]));return json(res,{ok:true,employees:rows.map(p=>({code:p.employee_code,name:p.full_name,role:p.role==='PHARMACIST'?'DOCTOR':p.role,active:p.active,branch:names.get(p.branch_id)||'Unassigned'}))})}catch(e){return json(res,{ok:false,error:e.message},503)}}return json(res,{ok:true,employees:state.employees.map(({password,passwordHash,...employee})=>({...employee,role:employee.role==='PHARMACIST'?'DOCTOR':employee.role}))})})();
