@@ -5,6 +5,7 @@ const STAFF_MAX_GPS_ACCURACY_METERS = 100;
 const SITE_CAPTURE_MAX_GPS_ACCURACY_METERS = 20;
 
 const SESSION_COOKIE = 'nance_session';
+const sessionCookieName = req => req.socket.localPort === 4174 ? 'nance_staff_session' : SESSION_COOKIE;
 const SESSION_DURATION_MS = 12 * 60 * 60 * 1000;
 const sessions = new Map();
 const loginAttempts = new Map();
@@ -58,7 +59,7 @@ export function createDentalApi({ supabaseUrl, anonKey, serviceKey, adminUsernam
 
   function getSession(req) {
     const cookies = String(req.headers.cookie || '').split(';');
-    const token = cookies.map(cookie => cookie.trim()).find(cookie => cookie.startsWith(`${SESSION_COOKIE}=`))?.slice(SESSION_COOKIE.length + 1);
+    const token = cookies.map(cookie => cookie.trim()).find(cookie => cookie.startsWith(`${sessionCookieName(req)}=`))?.slice(sessionCookieName(req).length + 1);
     if (!token) return null;
     const key = crypto.createHash('sha256').update(decodeURIComponent(token)).digest('hex');
     const session = sessions.get(key);
@@ -75,17 +76,17 @@ export function createDentalApi({ supabaseUrl, anonKey, serviceKey, adminUsernam
     const key = crypto.createHash('sha256').update(token).digest('hex');
     sessions.set(key, { ...user, expiresAt: Date.now() + SESSION_DURATION_MS });
     const secure = req.socket.encrypted || req.headers['x-forwarded-proto'] === 'https';
-    res.setHeader('Set-Cookie', `${SESSION_COOKIE}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_DURATION_MS / 1000}${secure ? '; Secure' : ''}`);
+    res.setHeader('Set-Cookie', `${sessionCookieName(req)}=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_DURATION_MS / 1000}${secure ? '; Secure' : ''}`);
   }
 
   function clearSession(req, res) {
     const session = getSession(req);
     if (session) {
       const cookies = String(req.headers.cookie || '').split(';');
-      const token = cookies.map(cookie => cookie.trim()).find(cookie => cookie.startsWith(`${SESSION_COOKIE}=`))?.slice(SESSION_COOKIE.length + 1);
+      const token = cookies.map(cookie => cookie.trim()).find(cookie => cookie.startsWith(`${sessionCookieName(req)}=`))?.slice(sessionCookieName(req).length + 1);
       if (token) sessions.delete(crypto.createHash('sha256').update(decodeURIComponent(token)).digest('hex'));
     }
-    res.setHeader('Set-Cookie', `${SESSION_COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`);
+    res.setHeader('Set-Cookie', `${sessionCookieName(req)}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`);
   }
 
   function requireAdmin(req, res) {
@@ -756,5 +757,5 @@ export function createDentalApi({ supabaseUrl, anonKey, serviceKey, adminUsernam
     return true;
   }
 
-  return { handle, configured, health, requireAdmin, getSession, recordSaleDirect, setStaffSession: (req, res, user) => setSession(res, req, { role: 'STAFF', ...user }) };
+  return { handle, configured, health, requireAdmin, requireSameOrigin, getSession, recordSaleDirect, setStaffSession: (req, res, user) => setSession(res, req, { role: 'STAFF', ...user }) };
 }

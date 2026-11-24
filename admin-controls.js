@@ -29,7 +29,7 @@ async function loadPurchases() {
 async function loadSuppliers() {
   const response = await fetch('/api/suppliers');
   const data = await response.json();
-  document.querySelector('#admin-module-content').innerHTML = `<div class="table-wrap"><table class="data-table"><thead><tr><th>SUPPLIER</th><th>CONTACT</th><th>PHONE</th><th>EMAIL</th><th>BRANDS</th><th>MEDICINE CATEGORIES</th></tr></thead><tbody>${data.suppliers.map(s => `<tr><td><strong>${s.name}</strong></td><td>${s.contact || '-'}</td><td>${s.phone || '-'}</td><td>${s.email || '-'}</td><td>${s.brands || '-'}</td><td>${s.categories || '-'}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">No suppliers recorded</td></tr>'}</tbody></table></div>`;
+  document.querySelector('#admin-module-content').innerHTML = `<div class="table-wrap"><table class="data-table"><thead><tr><th>SUPPLIER</th><th>CONTACT</th><th>PHONE</th><th>EMAIL</th><th>BRANDS</th><th>MEDICINE CATEGORIES</th></tr></thead><tbody>${data.suppliers.map(s => `<tr><td><strong>${escapeDentalHtml(s.name)}</strong></td><td>${escapeDentalHtml(s.contact || '-')}</td><td>${escapeDentalHtml(s.phone || '-')}</td><td>${escapeDentalHtml(s.email || '-')}</td><td>${escapeDentalHtml(s.brands || '-')}</td><td>${escapeDentalHtml(s.categories || '-')}</td></tr>`).join('') || '<tr><td colspan="6" class="empty">No suppliers recorded</td></tr>'}</tbody></table></div>`;
 }
 
 async function refreshReports() {
@@ -56,7 +56,7 @@ async function purchaseForm() {
   const modal = document.createElement('div');
   modal.id = 'admin-form-modal';
   modal.className = 'payment-modal';
-  modal.innerHTML = `<div class="payment-card"><h2>Receive purchase</h2><p class="muted">Every purchase is linked to a supplier. Choose an existing supplier or add a new one.</p><label>Supplier<select id="admin-supplier" class="search" style="width:100%;margin:4px 0 8px"><option value="">Select supplier...</option>${suppliers.map(supplier => `<option value="${supplier.id}">${supplier.name}</option>`).join('')}<option value="__new__">＋ New supplier</option></select></label><div id="admin-new-supplier-fields" style="display:none"><input id="admin-supplier-name" class="search" style="width:100%;margin:4px 0 8px" placeholder="New supplier name"><input id="admin-supplier-contact" class="search" style="width:100%;margin:4px 0 8px" placeholder="Contact person (optional)"><input id="admin-supplier-phone" class="search" style="width:100%;margin:4px 0 8px" placeholder="Phone (optional)"><input id="admin-supplier-email" class="search" style="width:100%;margin:4px 0 8px" placeholder="Email (optional)"><input id="admin-supplier-brands" class="search" style="width:100%;margin:4px 0 8px" placeholder="Brands sold (optional)"><input id="admin-supplier-categories" class="search" style="width:100%;margin:4px 0 8px" placeholder="Medicine categories (optional)"></div><label>Medicine<select id="admin-existing-name" class="search" style="width:100%;margin:4px 0 8px"><option value="">Select existing medicine...</option>${inventory.map(item => `<option value="${item.name}">${item.name}</option>`).join('')}<option value="__new__">＋ New medicine</option></select></label><input id="admin-name" class="search" style="width:100%;margin:4px 0 8px;display:none" placeholder="Type new medicine name"><label>Generic name (optional)<input id="admin-generic" class="search" style="width:100%;margin:4px 0 8px" placeholder="Can be left blank"></label><fieldset><legend>Quantity received</legend><div class="form-grid"><label>Boxes<input id="admin-boxes" type="number" min="0" value="0" class="search" placeholder="0"></label><label>Loose strips<input id="admin-strips" type="number" min="0" value="0" class="search" placeholder="0"></label><label>Loose pieces<input id="admin-pieces" type="number" min="0" value="0" class="search" placeholder="0"></label></div><p class="muted">Enter any combination. Leave unused quantities as 0.</p></fieldset><fieldset><legend>Pack size conversion</legend><div class="form-grid"><label>Strips in 1 box<input id="admin-strips-per-box" type="number" min="1" value="10" class="search"></label><label>Pieces in 1 strip<input id="admin-pieces-per-strip" type="number" min="1" value="10" class="search"></label></div><p class="muted">Example: 10 strips per box and 10 pieces per strip means 1 box = 100 pieces.</p></fieldset><label>Buying price per piece<input id="admin-buy-price" type="number" min="0" step="0.01" class="search" style="width:100%;margin:4px 0 8px" placeholder="₹0.00"></label><label>Tax on buying price (%)<input id="admin-tax-percent" type="number" min="0" step="0.01" value="0" class="search" style="width:100%;margin:4px 0 8px"></label><p class="muted">Tax 0% means no tax is added. Example: ₹100 subtotal + 5% tax = ₹105 total.</p><label>Selling price per piece<input id="admin-selling-price" type="number" min="0" step="0.01" class="search" style="width:100%;margin:4px 0 8px" placeholder="₹0.00"></label><button class="primary" id="admin-form-submit" style="width:100%;margin-top:8px">Receive stock</button><button class="secondary" style="width:100%;margin-top:8px" onclick="this.closest('.payment-modal').remove()">Cancel</button><p id="admin-form-result" class="muted"></p></div>`;
+  modal.innerHTML = `<div class="payment-card"><h2>Receive purchase</h2><p class="muted">Every purchase is linked to a supplier. Choose an existing supplier or add a new one.</p><label>Supplier<select id="admin-supplier" class="search" style="width:100%;margin:4px 0 8px"><option value="">Select supplier...</option>${suppliers.map(supplier => `<option value="${supplier.id}">${escapeDentalHtml(supplier.name)}</option>`).join('')}<option value="__new__">＋ New supplier</option></select></label><div id="admin-new-supplier-fields" style="display:none"><input id="admin-supplier-name" class="search" style="width:100%;margin:4px 0 8px" placeholder="New supplier name"><input id="admin-supplier-contact" class="search" style="width:100%;margin:4px 0 8px" placeholder="Contact person (optional)"><input id="admin-supplier-phone" class="search" style="width:100%;margin:4px 0 8px" placeholder="Phone (optional)"><input id="admin-supplier-email" class="search" style="width:100%;margin:4px 0 8px" placeholder="Email (optional)"><input id="admin-supplier-brands" class="search" style="width:100%;margin:4px 0 8px" placeholder="Brands sold (optional)"><input id="admin-supplier-categories" class="search" style="width:100%;margin:4px 0 8px" placeholder="Medicine categories (optional)"></div><label>Medicine<select id="admin-existing-name" class="search" style="width:100%;margin:4px 0 8px"><option value="">Select existing medicine...</option>${inventory.map(item => `<option value="${item.name}">${item.name}</option>`).join('')}<option value="__new__">＋ New medicine</option></select></label><input id="admin-name" class="search" style="width:100%;margin:4px 0 8px;display:none" placeholder="Type new medicine name"><label>Generic name (optional)<input id="admin-generic" class="search" style="width:100%;margin:4px 0 8px" placeholder="Can be left blank"></label><fieldset><legend>Quantity received</legend><div class="form-grid"><label>Boxes<input id="admin-boxes" type="number" min="0" value="0" class="search" placeholder="0"></label><label>Loose strips<input id="admin-strips" type="number" min="0" value="0" class="search" placeholder="0"></label><label>Loose pieces<input id="admin-pieces" type="number" min="0" value="0" class="search" placeholder="0"></label></div><p class="muted">Enter any combination. Leave unused quantities as 0.</p></fieldset><fieldset><legend>Pack size conversion</legend><div class="form-grid"><label>Strips in 1 box<input id="admin-strips-per-box" type="number" min="1" value="10" class="search"></label><label>Pieces in 1 strip<input id="admin-pieces-per-strip" type="number" min="1" value="10" class="search"></label></div><p class="muted">Example: 10 strips per box and 10 pieces per strip means 1 box = 100 pieces.</p></fieldset><label>Buying price per piece<input id="admin-buy-price" type="number" min="0" step="0.01" class="search" style="width:100%;margin:4px 0 8px" placeholder="₹0.00"></label><label>Tax on buying price (%)<input id="admin-tax-percent" type="number" min="0" step="0.01" value="0" class="search" style="width:100%;margin:4px 0 8px"></label><p class="muted">Tax 0% means no tax is added. Example: ₹100 subtotal + 5% tax = ₹105 total.</p><label>Selling price per piece<input id="admin-selling-price" type="number" min="0" step="0.01" class="search" style="width:100%;margin:4px 0 8px" placeholder="₹0.00"></label><button class="primary" id="admin-form-submit" style="width:100%;margin-top:8px">Receive stock</button><button class="secondary" style="width:100%;margin-top:8px" onclick="this.closest('.payment-modal').remove()">Cancel</button><p id="admin-form-result" class="muted"></p></div>`;
   document.body.appendChild(modal);
   const existing = document.querySelector('#admin-existing-name');
   const newName = document.querySelector('#admin-name');
@@ -98,22 +98,73 @@ function supplierForm() {
   });
 }
 
-function adminList(view, selectedDate = '') {
-  if (view === 'bills') {
-    fetch('/api/state', { cache: 'no-store' }).then(response => response.json()).then(state => {
-      const dayKey = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-      const today = new Date();
-      const todayKey = dayKey(today);
-      const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1);
-      const activeDate = selectedDate || todayKey;
-      const bills = Array.isArray(state.transactions) ? state.transactions.filter(t => dayKey(new Date(t.createdAt)) === activeDate) : [];
+async function adminList(view, selectedDate = '') {
+  if (view !== 'bills') return renderAdminList(view);
+  const app = document.querySelector('#app');
+  const previousView = app.firstElementChild;
+  const previousDoctor = app.querySelector('#bills-doctor')?.value || '';
+  const previousMedicine = app.querySelector('#bills-medicine')?.value || '';
+  const dayFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+  const dayKey = date => dayFormatter.format(date);
+  const today = new Date();
+  const todayKey = dayKey(today);
+  const yesterday = dayKey(new Date(today.getTime() - 86400000));
+  let activeDate = selectedDate || todayKey;
+  let doctor = previousDoctor;
+  let medicine = previousMedicine;
+  const safe = escapeDentalHtml;
+  const nameKey = value => String(value || '').trim().toLowerCase();
+  const optionsFor = (names, selected) => {
+    const options = new Map();
+    for (const name of names) {
+      const key = nameKey(name);
+      if (key && !options.has(key)) options.set(key, name.trim());
+    }
+    return [...options].sort(([, a], [, b]) => a.localeCompare(b)).map(([key, label]) =>
+      `<option value="${safe(key)}"${key === selected ? ' selected' : ''}>${safe(label)}</option>`
+    ).join('');
+  };
+  try {
+    const response = await fetch('/api/state', { cache: 'no-store' });
+    const state = await response.json();
+    if (app.firstElementChild !== previousView) return;
+    if (!response.ok) throw new Error(state.error || 'Could not load bills.');
+    const transactions = state.transactions || [];
+    const render = focusId => {
+      const doctorOptions = optionsFor(transactions.map(bill => bill.doctor), doctor);
+      const medicineOptions = optionsFor(transactions.flatMap(bill => (bill.items || []).map(item => item.name)), medicine);
+      const bills = transactions.filter(bill =>
+        dayKey(new Date(bill.createdAt)) === activeDate &&
+        (!doctor || nameKey(bill.doctor) === doctor) &&
+        (!medicine || (bill.items || []).some(item => nameKey(item.name) === medicine))
+      );
       const totals = { Cash: 0, UPI: 0, Card: 0 };
-      bills.forEach(bill => { const method = String(bill.payment || 'Cash'); if (totals[method] !== undefined) totals[method] += Number(bill.amount) || 0; });
+      for (const bill of bills) {
+        const method = bill.payment || 'Cash';
+        if (Object.hasOwn(totals, method)) totals[method] += Number(bill.amount) || 0;
+      }
       const total = bills.reduce((sum, bill) => sum + (Number(bill.amount) || 0), 0);
-      const safe = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
-      document.querySelector('#app').innerHTML = `<div class="content"><div class="page-heading"><div><h1>Bills</h1><p>Sales for the selected date.</p></div><div class="top-actions"><button class="secondary" onclick="downloadExcel('bills')">⇩ Excel</button><a class="secondary" href="#" data-admin-view="dashboard">← Back to dashboard</a></div></div><div class="filters"><label class="date-filter">Date <input id="bills-date" type="date" value="${activeDate}"></label><button class="filter ${activeDate === todayKey ? 'active' : ''}" data-bills-date="${todayKey}">Today</button><button class="filter ${activeDate === dayKey(yesterday) ? 'active' : ''}" data-bills-date="${dayKey(yesterday)}">Yesterday</button></div><div class="stats payment-summary"><div class="stat-card"><div class="stat-top"><span>Total sales</span></div><div class="stat-value">₹${total.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div><div class="trend">${bills.length} bill${bills.length === 1 ? '' : 's'}</div></div><div class="stat-card"><div class="stat-top"><span>Cash</span></div><div class="stat-value">₹${totals.Cash.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div></div><div class="stat-card"><div class="stat-top"><span>UPI</span></div><div class="stat-value">₹${totals.UPI.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div></div><div class="stat-card"><div class="stat-top"><span>Card</span></div><div class="stat-value">₹${totals.Card.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div></div></div><div class="panel"><div class="table-wrap"><table class="data-table"><thead><tr><th>INVOICE</th><th>DATE</th><th>BRANCH</th><th>CUSTOMER</th><th>PATIENT SOURCE</th><th>MEDICINES</th><th>EMPLOYEE</th><th>AMOUNT</th><th>PAYMENT</th></tr></thead><tbody>${bills.map(t => `<tr><td>${safe(t.invoice)}</td><td>${safe(new Date(t.createdAt).toLocaleString('en-IN'))}</td><td>${safe(t.branch)}</td><td>${safe(t.customer)}<br><span class="muted">${safe(t.phone || '')}</span></td><td>${t.patientSource === 'DOCTOR_REFERRAL' ? `Doctor referral${t.doctor ? `: ${safe(t.doctor)}` : ''}` : 'Walk-in'}</td><td>${(t.items || []).map(item => `${safe(item.name)} × ${Number(item.quantity) || 0}`).join('<br>') || '-'}</td><td>${safe(t.employee || '-')}</td><td>₹${Number(t.amount || 0).toFixed(2)}</td><td>${safe(t.payment || 'Cash')}</td></tr>`).join('') || '<tr><td colspan="9" class="empty">No bills for this date</td></tr>'}</tbody></table></div></div></div>`;
-      document.querySelector('#bills-date').onchange = event => adminList('bills', event.target.value);
-      document.querySelectorAll('[data-bills-date]').forEach(button => { button.onclick = () => adminList('bills', button.dataset.billsDate); });
-    });
-  } else renderAdminList(view);
+      document.querySelector('#app').innerHTML = `<div class="content"><div class="page-heading"><div><h1>Bills</h1><p>Filter sales by date, referring doctor, or medicine.</p></div><div class="top-actions"><button class="secondary" id="bills-export">⇩ Excel</button><a class="secondary" href="#" data-admin-view="dashboard">← Back to dashboard</a></div></div><div class="filters"><label class="date-filter">Date <input id="bills-date" type="date" value="${safe(activeDate)}"></label><button class="filter ${activeDate === todayKey ? 'active' : ''}" data-bills-date="${todayKey}">Today</button><button class="filter ${activeDate === yesterday ? 'active' : ''}" data-bills-date="${yesterday}">Yesterday</button>
+      <label class="date-filter">Doctor <select id="bills-doctor" class="branch-select">
+        <option value="">All doctors</option>${doctorOptions}
+      </select></label>
+      <label class="date-filter">Medicine <select id="bills-medicine" class="branch-select">
+        <option value="">All medicines</option>${medicineOptions}
+      </select></label>
+      </div><div class="stats payment-summary"><div class="stat-card"><div class="stat-top"><span>Total sales</span></div><div class="stat-value">₹${total.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div><div class="trend">${bills.length} bill${bills.length === 1 ? '' : 's'}</div></div><div class="stat-card"><div class="stat-top"><span>Cash</span></div><div class="stat-value">₹${totals.Cash.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div></div><div class="stat-card"><div class="stat-top"><span>UPI</span></div><div class="stat-value">₹${totals.UPI.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div></div><div class="stat-card"><div class="stat-top"><span>Card</span></div><div class="stat-value">₹${totals.Card.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</div></div></div><div class="panel"><div class="table-wrap"><table class="data-table"><thead><tr><th>INVOICE</th><th>DATE</th><th>BRANCH</th><th>CUSTOMER</th><th>PATIENT SOURCE</th><th>MEDICINES</th><th>EMPLOYEE</th><th>AMOUNT</th><th>PAYMENT</th></tr></thead><tbody>${bills.map(t => `<tr><td>${safe(t.invoice)}</td><td>${safe(new Date(t.createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }))}</td><td>${safe(t.branch)}</td><td>${safe(t.customer)}<br><span class="muted">${safe(t.phone || '')}</span></td><td>${t.patientSource === 'DOCTOR_REFERRAL' ? `Doctor referral${t.doctor ? `: ${safe(t.doctor)}` : ''}` : 'Walk-in'}</td><td>${(t.items || []).map(item => `${safe(item.name)} × ${Number(item.quantity) || 0}`).join('<br>') || '-'}</td><td>${safe(t.employee || '-')}</td><td>₹${Number(t.amount || 0).toFixed(2)}</td><td>${safe(t.payment || 'Cash')}</td></tr>`).join('') || '<tr><td colspan="9" class="empty">No bills match these filters</td></tr>'}</tbody></table></div></div></div>`;
+
+      const setDate = date => { activeDate = date || todayKey; render('bills-date'); };
+      app.querySelector('#bills-date').onchange = event => setDate(event.target.value);
+      app.querySelectorAll('[data-bills-date]').forEach(button => { button.onclick = () => setDate(button.dataset.billsDate); });
+      app.querySelector('#bills-doctor').onchange = event => { doctor = event.target.value; render('bills-doctor'); };
+      app.querySelector('#bills-medicine').onchange = event => { medicine = event.target.value; render('bills-medicine'); };
+      app.querySelector('#bills-export').onclick = () => {
+        window.location.href = '/api/export/bills?' + new URLSearchParams({ date: activeDate, doctor, medicine });
+      };
+      if (focusId) app.querySelector('#' + focusId)?.focus();
+    };
+    render();
+  } catch (error) {
+    app.innerHTML = `<div class="content"><h1>Bills</h1><p role="status">${safe(error.message)}</p></div>`;
+  }
 }
